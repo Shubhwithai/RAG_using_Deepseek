@@ -106,9 +106,6 @@ def main():
         with st.spinner("Fetching your answer..."):
             user_input(user_question)
 
-    st.sidebar.info(
-        "**Note:** This app uses Groq's Mixtral-8x7b model for answering questions accurately."
-    )
 
 if __name__ == "__main__":
     main()
