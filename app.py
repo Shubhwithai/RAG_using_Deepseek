@@ -1,100 +1,55 @@
 import streamlit as st
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.prompts import PromptTemplate
-from openai import OpenAI
-import PyPDF2  # Add PyPDF2 for PDF text extraction
+from phi.agent import Agent
+from phi.model.groq import GroqChat
+from phi.storage.agent.sqlite import SqlAgentStorage
+from phi.tools.duckduckgo import DuckDuckGo
+from phi.tools.yfinance import YFinanceTools
 
-def get_pdf_text(pdf_files):
-    """Extracts text from uploaded PDF files."""
-    raw_text = ""
-    for pdf_file in pdf_files:
-        with pdf_file as f:
-            pdf_reader = PyPDF2.PdfReader(f)
-            for page in pdf_reader.pages:
-                raw_text += page.extract_text()
-    return raw_text
+# pip install phi streamlit groq
 
-def get_vector_store(text_chunks):
-    """Creates and saves a FAISS vector store from text chunks."""
-    embeddings = OpenAIEmbeddings()
-    vector_store = FAISS.from_texts(text_chunks, embedding=embeddings)
-    vector_store.save_local("faiss_index")
+import os
+os.environ["GROQ_API_KEY"] = "your_groq_api_key_here"
 
-def get_conversational_chain():
-    """Sets up a conversational chain using OpenAI via OpenRouter."""
-    prompt_template = """
-    Answer the question as detailed as possible from the provided context. If the answer is not in
-    the provided context, just say, "answer is not available in the context." Do not provide incorrect answers.
+# Create Web Agent
+web_agent = Agent(
+    name="Web Agent",
+    role="Search the web for information",
+    model=GroqChat(model="deepseek-r1-distill-llama-70b"),
+    tools=[DuckDuckGo()],
+    storage=SqlAgentStorage(table_name="web_agent", db_file="agents.db"),
+    add_history_to_messages=True,
+    markdown=True,
+)
 
-    Context:
-    {context}?
+# Create Finance Agent
+finance_agent = Agent(
+    name="Finance Agent",
+    role="Get financial data",
+    model=GroqChat(model="deepseek-r1-distill-llama-70b"),
+    tools=[YFinanceTools(stock_price=True, analyst_recommendations=True, company_info=True, company_news=True)],
+    instructions=["Always use tables to display data"],
+    storage=SqlAgentStorage(table_name="finance_agent", db_file="agents.db"),
+    add_history_to_messages=True,
+    markdown=True,
+)
 
-    Question:
-    {question}
+# Create Agent Team
+agent_team = Agent(
+    team=[web_agent, finance_agent],
+    name="Agent Team (Web+Finance)",
+    model=GroqChat(model="deepseek-r1-distill-llama-70b"),
+    show_tool_calls=True,
+    markdown=True,
+)
 
-    Answer:
-    """
-    
-    prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-    
-    def query_model(context, question):
-        completion = OpenAI.Completion.create(
-            model="deepseek/deepseek-r1",
-            prompt=prompt_template.format(context=context, question=question),
-            max_tokens=150
-        )
-        return completion.choices[0].text.strip()
+# Streamlit UI
+st.title("Finance Agent Team")
 
-    return query_model
-    
-def user_input(user_question):
-    """Handles user queries by retrieving answers from the vector store."""
-    embeddings = OpenAIEmbeddings()
-    new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
-    docs = new_db.similarity_search(user_question)
-    
-    chain = get_conversational_chain()
-    
-    context = "\n".join([doc.page_content for doc in docs])
-    response = chain(context, user_question)
-    
-    st.markdown(f"### Reply:\n{response}")
-
-def main():
-    """Main function to run the Streamlit app."""
-    st.set_page_config(page_title="Chat PDF", page_icon=":books:", layout="wide")
-    st.title("Chat with PDF using OpenAI (deepseek-r1) via OpenRouter :smile:")
-    
-    st.sidebar.header("Upload & Process PDF Files")
-    
-    with st.sidebar:
-        pdf_docs = st.file_uploader(
-            "Upload your PDF files:",
-            accept_multiple_files=True,
-            type=["pdf"]
-        )
-        if st.button("Submit & Process"):
-            with st.spinner("Processing your files..."):
-                raw_text = get_pdf_text(pdf_docs)  # This will now work
-                text_chunks = get_text_chunks(raw_text)
-                get_vector_store(text_chunks)
-                st.success("PDFs processed and indexed successfully!")
-
-    st.markdown(
-        "### Ask Questions from Your PDF Files :mag:\n"
-        "Once you upload and process your PDFs, type your questions below."
-    )
-
-    user_question = st.text_input("Enter your question:", placeholder="What do you want to know?")
-
-    if user_question:
-        with st.spinner("Fetching your answer..."):
-            user_input(user_question)
-
-    st.sidebar.info(
-        "**Note:** This app uses OpenAI's deepseek-r1 model via OpenRouter for answering questions accurately."
-    )
+user_input = st.text_input("Enter your question:")
+if st.button("Submit"):
+    with st.spinner("Processing..."):
+        response = agent_team.run(user_input)
+    st.markdown(response)
 
 if __name__ == "__main__":
-    main()
+    st.set_page_config(page_title="Finance Agent Team", page_icon="💼")
