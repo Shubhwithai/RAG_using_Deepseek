@@ -1,38 +1,8 @@
 import streamlit as st
-from PyPDF2 import PdfReader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-import os
-from langchain_openai import OpenAIEmbeddings  # Using OpenAI embeddings as alternative
+from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
-from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 from openai import OpenAI
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
-api_key = os.getenv("OPENROUTER_API_KEY")
-
-# OpenAI client setup via OpenRouter
-client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=api_key,
-)
-
-def get_pdf_text(pdf_docs):
-    """Extracts text from uploaded PDF files."""
-    text = ""
-    for pdf in pdf_docs:
-        pdf_reader = PdfReader(pdf)
-        for page in pdf_reader.pages:
-            text += page.extract_text()
-    return text
-
-def get_text_chunks(text):
-    """Splits extracted text into manageable chunks."""
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=10000, chunk_overlap=1000)
-    chunks = text_splitter.split_text(text)
-    return chunks
 
 def get_vector_store(text_chunks):
     """Creates and saves a FAISS vector store from text chunks."""
@@ -58,11 +28,14 @@ def get_conversational_chain():
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
     
     def query_model(context, question):
-    completion = client.chat.completions.create(
-        model="deepseek/deepseek-r1",
-        messages=[{"role": "system", "content": prompt_template.format(context=context, question=question)}]
-    )
-    return completion.choices[0].message.content  # Corrected
+        completion = OpenAI.Completion.create(
+            model="deepseek/deepseek-r1",
+            prompt=prompt_template.format(context=context, question=question),
+            max_tokens=150
+        )
+        return completion.choices[0].text.strip()
+
+    return query_model
     
 def user_input(user_question):
     """Handles user queries by retrieving answers from the vector store."""
