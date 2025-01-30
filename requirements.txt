@@ -1,3 +1,7 @@
-phidata
-streamlit 
-groq
+streamlit
+pypdf2
+langchain
+langchain-openai
+faiss-cpu  # For FAISS vector store
+python-dotenv
+openai
