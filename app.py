@@ -2,7 +2,7 @@ import streamlit as st
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
-from langchain_openai import OpenAIEmbeddings  # Using OpenAI embeddings as alternative
+from langchain_openai import OpenAIEmbeddings, ChatOpenAI  # Import ChatOpenAI
 from langchain.vectorstores import FAISS
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
@@ -35,7 +35,7 @@ def get_vector_store(text_chunks):
     vector_store.save_local("faiss_index")
 
 def get_conversational_chain():
-    """Sets up a conversational chain using OpenAI client with OpenRouter."""
+    """Sets up a conversational chain using OpenAI client with OpenRouter and ChatOpenAI."""
     prompt_template = """
     Answer the question as detailed as possible from the provided context. If the answer is not in
     the provided context, just say, "answer is not available in the context." Do not provide incorrect answers.
@@ -54,10 +54,14 @@ def get_conversational_chain():
       api_key=os.getenv('OPENROUTER_API_KEY'), # Use OPENROUTER_API_KEY
     )
 
-    model = client.chat.completions # Use OpenAI client for chat completions
+    model = ChatOpenAI(
+        openai_api_key=os.getenv('OPENROUTER_API_KEY'), # Pass API key again for ChatOpenAI
+        openai_api_base="https://openrouter.ai/api/v1", # Pass API base for ChatOpenAI
+        model_name="deepseek/deepseek-r1",  # Specify the model name here for ChatOpenAI
+    )
 
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-    chain = load_qa_chain(llm=model, chain_type="stuff", prompt=prompt, verbose=False) # Pass OpenAI client to load_qa_chain
+    chain = load_qa_chain(llm=model, chain_type="stuff", prompt=prompt, verbose=False) # Pass ChatOpenAI instance as llm
     return chain
 
 def user_input(user_question):
