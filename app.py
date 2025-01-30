@@ -58,11 +58,11 @@ def get_conversational_chain():
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
     
     def query_model(context, question):
-        completion = client.chat.completions.create(
-            model="deepseek/deepseek-r1",
-            messages=[{"role": "system", "content": prompt_template.format(context=context, question=question)}]
-        )
-        return completion.choices[0].message["content"]
+    completion = client.chat.completions.create(
+        model="deepseek/deepseek-r1",
+        messages=[{"role": "system", "content": prompt_template.format(context=context, question=question)}]
+    )
+    return completion.choices[0].message.content  # Corrected
     
     return query_model
 
