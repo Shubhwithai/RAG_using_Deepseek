@@ -77,11 +77,10 @@ def user_input(user_question):
 def main():
     """Main function to run the Streamlit app."""
     st.set_page_config(page_title="Chat PDF", page_icon=":books:", layout="wide")
-    st.title("Chat with PDF using Groq (Mixtral-8x7b) :smile:")
+    st.title("Chat with PDF using Groq (deepseek-r1-distill-llama-70b) :smile:")
     
     st.sidebar.header("Upload & Process PDF Files")
-    st.sidebar.markdown(
-        "Using Groq's Mixtral-8x7b model for advanced conversational capabilities.")
+  
     
     with st.sidebar:
         pdf_docs = st.file_uploader(
