@@ -11,7 +11,7 @@ from openai import OpenAI # Import OpenAI
 
 # Load environment variables
 load_dotenv()
- os.getenv("OPENROUTER_API_KEY") 
+os.getenv("OPENROUTER_API_KEY") 
 
 def get_pdf_text(pdf_docs):
     """Extracts text from uploaded PDF files."""
