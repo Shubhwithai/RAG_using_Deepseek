@@ -3,6 +3,17 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.prompts import PromptTemplate
 from openai import OpenAI
+import PyPDF2  # Add PyPDF2 for PDF text extraction
+
+def get_pdf_text(pdf_files):
+    """Extracts text from uploaded PDF files."""
+    raw_text = ""
+    for pdf_file in pdf_files:
+        with pdf_file as f:
+            pdf_reader = PyPDF2.PdfReader(f)
+            for page in pdf_reader.pages:
+                raw_text += page.extract_text()
+    return raw_text
 
 def get_vector_store(text_chunks):
     """Creates and saves a FAISS vector store from text chunks."""
@@ -65,7 +76,7 @@ def main():
         )
         if st.button("Submit & Process"):
             with st.spinner("Processing your files..."):
-                raw_text = get_pdf_text(pdf_docs)
+                raw_text = get_pdf_text(pdf_docs)  # This will now work
                 text_chunks = get_text_chunks(raw_text)
                 get_vector_store(text_chunks)
                 st.success("PDFs processed and indexed successfully!")
