@@ -1,98 +1,62 @@
-import json
-import tempfile
-import csv
 import streamlit as st
-import pandas as pd
-from phi.model.groq import GroqChat  
-from phi.agent.duckdb import DuckDbAgent
-from phi.tools.pandas import PandasTools
-import re
+from phi.assistant import Assistant
+from phi.tools.hackernews import HackerNews
+from phi.llm.groq import GroqChat
 
+# Set up the Streamlit app
+st.title("Multi-Agent AI Researcher 🔍🤖")
+st.caption("This app allows you to research top stories and users on HackerNews and generate insightful content.")
 
-# Streamlit app
-st.title("📊 Data Analyst Agent")
+# Get Groq API key from user
+groq_api_key = st.text_input("Groq API Key", type="password")
 
-# Sidebar for API keys
-with st.sidebar:
-    st.header("API Keys")
-    groq_key = st.text_input("Enter your Groq API key:", type="password")
-    if groq_key:
-        st.session_state.groq_key = groq_key
-        st.success("API key saved!")
-    else:
-        st.warning("Please enter your Groq API key to proceed.")
-
-# File upload widget
-uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
-
-if uploaded_file is not None and "groq_key" in st.session_state:
-    # Preprocess and save the uploaded file
-    temp_path, columns, df = preprocess_and_save(uploaded_file)
+if groq_api_key:
+    # Create instances of the Assistant
+    story_researcher = Assistant(
+        name="HackerNews Story Researcher",
+        role="Researches and analyzes top HackerNews stories, providing detailed insights and trends.",
+        tools=[HackerNews()],
+    )
     
-    if temp_path and columns and df is not None:
-        # Display the uploaded data as a table
-        st.write("Uploaded Data:")
-        st.dataframe(df)  # Use st.dataframe for an interactive table
-        
-        # Display the columns of the uploaded data
-        st.write("Uploaded columns:", columns)
-        
-        # Configure the semantic model with the temporary file path
-        semantic_model = {
-            "tables": [
-                {
-                    "name": "uploaded_data",
-                    "description": "Contains the uploaded dataset.",
-                    "path": temp_path,
-                }
-            ]
-        }
-        
-        # Initialize the DuckDbAgent for SQL query generation
-        duckdb_agent = DuckDbAgent(
-            model=GroqChat(model="deepseek-r1-distill-llama-70b", api_key=st.session_state.groq_key),  # Use GroqChat
-            semantic_model=json.dumps(semantic_model),
-            tools=[PandasTools()],
-            markdown=True,
-            add_history_to_messages=False,  # Disable chat history
-            followups=False,  # Disable follow-up queries
-            read_tool_call_history=False,  # Disable reading tool call history
-            system_prompt="You are an expert data analyst. Generate SQL queries to solve the user's query. Return only the SQL query, enclosed in ```sql ``` and give the final answer.",
+    user_researcher = Assistant(
+        name="HackerNews User Researcher",
+        role="Analyzes HackerNews user profiles, their contributions, and impact on the community.",
+        tools=[HackerNews()],
+    )
+    
+    hn_assistant = Assistant(
+        name="HackerNews Insights Team",
+        team=[story_researcher, user_researcher],
+        llm=GroqChat(
+            model="deepseek-r1-distill-llama-70b",
+            max_tokens=2048,
+            temperature=0.7,
+            api_key=groq_api_key
+        ),
+        system_prompt=(
+            "You are an expert HackerNews analyst team. Your goal is to provide in-depth insights, "
+            "trend analysis, and valuable information based on HackerNews data. When responding:"
+            "\n1. Always provide context and explain the significance of your findings."
+            "\n2. Use data to support your insights whenever possible."
+            "\n3. Highlight emerging trends or patterns you observe."
+            "\n4. Consider the broader implications of the information for the tech industry or society."
+            "\n5. When appropriate, suggest follow-up questions or areas for further exploration."
         )
-        
-        # Initialize code storage in session state
-        if "generated_code" not in st.session_state:
-            st.session_state.generated_code = None
-        
-        # Main query input widget
-        user_query = st.text_area("Ask a query about the data:")
-        
-        # Add info message about terminal output
-        st.info("💡 Check your terminal for a clearer output of the agent's response")
-        
-        if st.button("Submit Query"):
-            if user_query.strip() == "":
-                st.warning("Please enter a query.")
-            else:
-                try:
-                    # Show loading spinner while processing
-                    with st.spinner('Processing your query...'):
-                        # Get the response from DuckDbAgent
-                        response1 = duckdb_agent.run(user_query)
-                        
-                        # Extract the content from the RunResponse object
-                        if hasattr(response1, 'content'):
-                            response_content = response1.content
-                        else:
-                            response_content = str(response1)
-                        response = duckdb_agent.print_response(
-                            user_query,
-                            stream=True,
-                        )
-                    
-                    # Display the response in Streamlit
-                    st.markdown(response_content)
-                    
-                except Exception as e:
-                    st.error(f"Error generating response from the DuckDbAgent: {e}")
-                    st.error("Please try rephrasing your query or check if the data format is correct.")
+    )
+    
+    # Input field for the research query
+    query = st.text_area("Enter your research query", height=100)
+    
+    if st.button("Generate Insights"):
+        if query:
+            with st.spinner("Analyzing HackerNews data..."):
+                # Get the response from the assistant
+                response = hn_assistant.run(query, stream=True)
+                
+                # Display the response
+                st.markdown("## Insights")
+                st.write(response)
+        else:
+            st.warning("Please enter a research query.")
+else:
+    st.warning("Please enter your Groq API key to proceed.")
