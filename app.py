@@ -64,8 +64,6 @@ def get_conversational_chain():
     )
     return completion.choices[0].message.content  # Corrected
     
-    return query_model
-
 def user_input(user_question):
     """Handles user queries by retrieving answers from the vector store."""
     embeddings = OpenAIEmbeddings()
