@@ -2,17 +2,18 @@ import streamlit as st
 from PyPDF2 import PdfReader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
-from langchain_openai import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings  # Using OpenAI embeddings as alternative
 from langchain.vectorstores import FAISS
-from openai import OpenAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
+from openai import OpenAI
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 api_key = os.getenv("OPENROUTER_API_KEY")
 
+# OpenAI client setup via OpenRouter
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=api_key,
@@ -40,7 +41,7 @@ def get_vector_store(text_chunks):
     vector_store.save_local("faiss_index")
 
 def get_conversational_chain():
-    """Sets up a conversational chain using OpenRouter API."""
+    """Sets up a conversational chain using OpenAI via OpenRouter."""
     prompt_template = """
     Answer the question as detailed as possible from the provided context. If the answer is not in
     the provided context, just say, "answer is not available in the context." Do not provide incorrect answers.
@@ -56,15 +57,14 @@ def get_conversational_chain():
     
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
     
-def query_openai(context, question):
+    def query_model(context, question):
         completion = client.chat.completions.create(
             model="deepseek/deepseek-r1",
-            messages=[{"role": "system", "content": "You are a helpful AI assistant."},
-                      {"role": "user", "content": f"Context: {context}\nQuestion: {question}"}]
+            messages=[{"role": "system", "content": prompt_template.format(context=context, question=question)}]
         )
-        return completion.choices[0].message.content
+        return completion.choices[0].message["content"]
     
-    return query_openai
+    return query_model
 
 def user_input(user_question):
     """Handles user queries by retrieving answers from the vector store."""
@@ -72,8 +72,9 @@ def user_input(user_question):
     new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
     docs = new_db.similarity_search(user_question)
     
-    context = "\n".join([doc.page_content for doc in docs])
     chain = get_conversational_chain()
+    
+    context = "\n".join([doc.page_content for doc in docs])
     response = chain(context, user_question)
     
     st.markdown(f"### Reply:\n{response}")
@@ -81,7 +82,7 @@ def user_input(user_question):
 def main():
     """Main function to run the Streamlit app."""
     st.set_page_config(page_title="Chat PDF", page_icon=":books:", layout="wide")
-    st.title("Chat with PDF using OpenRouter AI (DeepSeek-R1) :smile:")
+    st.title("Chat with PDF using OpenAI (deepseek-r1) via OpenRouter :smile:")
     
     st.sidebar.header("Upload & Process PDF Files")
     
@@ -110,7 +111,7 @@ def main():
             user_input(user_question)
 
     st.sidebar.info(
-        "**Note:** This app uses OpenRouter AI (DeepSeek-R1) for answering questions accurately."
+        "**Note:** This app uses OpenAI's deepseek-r1 model via OpenRouter for answering questions accurately."
     )
 
 if __name__ == "__main__":
